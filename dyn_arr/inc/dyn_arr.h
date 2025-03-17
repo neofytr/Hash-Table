@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdint.h>
 
 #define MAX_NODE_SIZE (1U << 8)
 
@@ -13,6 +14,7 @@ typedef struct
     size_t last_index; // Index of the last element in the array
     size_t item_size;  // Size of each data item in bytes
     void **nodes;      // Array of node pointers
+    bool is_empty;
 } dyn_arr_t;
 
 // Function pointer type for comparing two items
