@@ -25,12 +25,27 @@ dyn_arr_t *dyn_arr_create(size_t min_size, size_t item_size)
         return dyn_arr;
     }
 
-    size_t num_of_nodes = (min_size + MAX_NODE_SIZE - 1) / MAX_NODE_SIZE;
+    size_t num_of_nodes = min_size / MAX_NODE_SIZE;
     void **nodes = (void **)calloc(num_of_nodes, sizeof(void *));
     if (!nodes)
     {
         free(dyn_arr);
         return NULL;
+    }
+
+    for (size_t index = 0; index < num_of_nodes; index++)
+    {
+        nodes[index] = malloc(MAX_NODE_SIZE * item_size);
+        if (!nodes[index])
+        {
+            for (size_t counter = 0; counter < index; counter++)
+            {
+                free(nodes[counter]);
+                free(nodes);
+                free(dyn_arr);
+                return NULL;
+            }
+        }
     }
 
     dyn_arr->len = num_of_nodes;

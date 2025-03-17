@@ -89,6 +89,12 @@ bool map_search(map_t *map, void *key, void *value)
             return false;
         }
 
+        if (node.is_empty)
+        {
+            // Empty slot means key is not in the map
+            return false;
+        }
+
         if (!memcmp(node.key, key, map->key_size))
         {
             // the keys are equal
@@ -98,6 +104,13 @@ bool map_search(map_t *map, void *key, void *value)
             }
 
             return true;
+        }
+
+        hash = (hash + 1) & (arr_len - 1); // linear probing
+        if (hash == original_hash)
+        {
+            // We've checked all positions and didn't find the key
+            return false;
         }
     }
 
@@ -137,6 +150,12 @@ bool map_remove(map_t *map, void *key)
             return false;
         }
 
+        if (node.is_empty)
+        {
+            // Empty slot means key is not in the map
+            return false;
+        }
+
         if (!memcmp(node.key, key, map->key_size))
         {
             // the keys are equal
@@ -148,6 +167,13 @@ bool map_remove(map_t *map, void *key)
 
             return true;
         }
+
+        hash = (hash + 1) & (arr_len - 1); // linear probing
+        if (hash == original_hash)
+        {
+            // We've checked all positions and didn't find the key
+            return false;
+        }
     }
 
     return false;
@@ -155,7 +181,7 @@ bool map_remove(map_t *map, void *key)
 
 static bool rehash(map_t *map)
 {
-    if (!map || map->allocated || map->arr)
+    if (!map || !map->allocated || !map->arr)
     {
         return false;
     }
@@ -169,45 +195,64 @@ static bool rehash(map_t *map)
     {
         return false;
     }
+
+    // Store original allocated stack
+    stack_t *old_alloc = map->allocated;
+    dyn_arr_t *old_arr = map->arr;
+
+    // Create new dynamic array with doubled size
+    dyn_arr_t *new_arr = dyn_arr_create(arr->len * 2, sizeof(map_node_t));
+    if (!new_arr)
+    {
+        stack_delete(new_alloc);
+        return false;
+    }
+
+    // Temporarily set new empty structures
     map->allocated = new_alloc;
+    map->arr = new_arr;
 
     map_node_t map_node;
     size_t hash_node_index;
 
     for (size_t index = 0; index < alloc_len; index++)
     {
-        if (!stack_pop(allocated, &hash_node_index))
+        if (!stack_pop(old_alloc, &hash_node_index))
         {
+            map->allocated = old_alloc;
+            map->arr = old_arr;
             stack_delete(new_alloc);
+            dyn_arr_free(new_arr);
             return false;
         }
 
-        if (!dyn_arr_get(arr, hash_node_index, &map_node))
+        if (!dyn_arr_get(old_arr, hash_node_index, &map_node))
         {
+            map->allocated = old_alloc;
+            map->arr = old_arr;
             stack_delete(new_alloc);
+            dyn_arr_free(new_arr);
             return false;
         }
 
-        map_node.is_empty = true;
-        if (!dyn_arr_set(arr, hash_node_index, &map_node))
+        if (!map_node.is_empty)
         {
-            stack_delete(new_alloc);
-            free(map_node.key);
-            free(map_node.value);
-            return false;
+            if (!map_insert(map, map_node.key, map_node.value))
+            {
+                map->allocated = old_alloc;
+                map->arr = old_arr;
+                stack_delete(new_alloc);
+                dyn_arr_free(new_arr);
+                return false;
+            }
         }
 
-        if (!map_insert(map, map_node.key, map_node.value))
-        {
-            stack_delete(new_alloc);
-            free(map_node.key);
-            free(map_node.value);
-            return false;
-        }
-
-        free(map_node.key);
-        free(map_node.value);
+        // Don't free nodes here, as we're reusing the pointers
     }
+
+    // Free old structures
+    stack_delete(old_alloc);
+    dyn_arr_free(old_arr);
 
     return true;
 }
@@ -232,20 +277,18 @@ bool map_insert(map_t *map, void *key, void *value)
     if (allocated->stack_size >= BUCKET_DOUBLING_CUTOFF * arr_len)
     {
         // double the number of nodes in the dynamic array and rehash
-        arr->len <<= 1U;
-        if (!rehash)
+        if (!rehash(map))
         {
-            arr->len >>= 1U;
             return false;
         }
+        arr = map->arr;                     // Get the new array after rehash
+        arr_len = arr->len * MAX_NODE_SIZE; // Get updated array length
     }
 
-    arr_len = arr->len * MAX_NODE_SIZE; // maybe arr->len is updated
-
     uint32_t hash = hash_murmur3_32(key, map->key_size) & (arr_len - 1);
+    uint32_t original_hash = hash;
 
     map_node_t node;
-    node.is_empty = false;
 
     while (true)
     {
@@ -279,6 +322,8 @@ bool map_insert(map_t *map, void *key, void *value)
                 return false;
             }
 
+            node.is_empty = false;
+
             // dyn_arr_set will copy the contents of the map_node node into the index hash
             // it will copy the pointers key and value and won't allocate them and save their values
             // so, we do this before inserting the node into the array
@@ -310,28 +355,38 @@ bool map_insert(map_t *map, void *key, void *value)
 
             if (!memcpy(node.key, key, map->key_size))
             {
-                free(node.key);
                 return false;
             }
 
             if (!memcpy(node.value, value, map->value_size))
             {
-                free(node.key);
-                free(node.value);
                 return false;
             }
 
             if (!dyn_arr_set(arr, hash, &node))
             {
-                free(node.key);
-                free(node.value);
                 return false;
             }
 
             if (!stack_push(allocated, &hash))
             {
-                free(node.key);
-                free(node.value);
+                return false;
+            }
+
+            return true;
+        }
+
+        // Check if the key already exists
+        if (!memcmp(node.key, key, map->key_size))
+        {
+            // Update existing key's value
+            if (!memcpy(node.value, value, map->value_size))
+            {
+                return false;
+            }
+
+            if (!dyn_arr_set(arr, hash, &node))
+            {
                 return false;
             }
 
@@ -339,6 +394,11 @@ bool map_insert(map_t *map, void *key, void *value)
         }
 
         hash = (hash + 1) & (arr_len - 1); // linear probing
+        if (hash == original_hash)
+        {
+            // Hash table is full (should not happen with rehashing)
+            return false;
+        }
     }
 
     return false;
@@ -369,7 +429,7 @@ map_t *map_create(size_t key_size, size_t value_size)
     map->allocated = stack_create(sizeof(size_t));
     if (!map->allocated)
     {
-        free(map->arr);
+        dyn_arr_free(map->arr);
         free(map);
         return NULL;
     }
@@ -411,5 +471,6 @@ bool map_destroy(map_t *map)
     }
 
     dyn_arr_free(map->arr);
+    free(map); // Free the map itself
     return true;
 }

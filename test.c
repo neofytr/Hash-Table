@@ -3,16 +3,21 @@
 
 int main()
 {
-    size_t key = 12;
-    size_t value = 14;
+    size_t value;
 
     map_t *map = map_create(sizeof(size_t), sizeof(size_t));
-    map_insert(map, &key, &value);
 
-    value = 7;
-    map_search(map, &key, &value);
+    for (size_t index = 0; index < 1024; index++)
+    {
+        value = index;
+        map_insert(map, &index, &value);
+    }
 
-    printf("%zu\n", value);
+    for (size_t index = 0; index < 1024; index++)
+    {
+        map_search(map, &index, &value);
+        printf("%zu\n", value);
+    }
 
     return EXIT_SUCCESS;
 }
