@@ -57,10 +57,9 @@ static inline uint32_t hash_murmur3_32(const void *key, size_t key_size)
     return h;
 }
 
-// we don't actually remove the map_node; we just mark it as free
-bool map_remove(map_t *map, void *key, void *value)
+bool map_search(map_t *map, void *key, void *value)
 {
-    if (!map || !key || !value)
+    if (!map || !key)
     {
         return false;
     }
@@ -80,27 +79,78 @@ bool map_remove(map_t *map, void *key, void *value)
 
     map_node_t node;
 
-    node.key = malloc(map->key_size);
-    if (!node.key)
+    while (true)
+    {
+        if (!dyn_arr_get(arr, hash, &node))
+        {
+            // this means the dynamic array node containing the index hash is not allocated
+            // this is possible only if the current key is not present in the table since we never actually
+            // destroy any map_node or dynamic array node
+            return false;
+        }
+
+        if (!memcmp(node.key, key, map->key_size))
+        {
+            // the keys are equal
+            if (!memcpy(value, node.value, map->value_size))
+            {
+                return false;
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// we don't actually remove the map_node; we just mark it as free
+bool map_remove(map_t *map, void *key)
+{
+    if (!map || !key)
     {
         return false;
     }
 
-    node.value = malloc(map->value_size);
-    if (!node.value)
+    if (!map->allocated || !map->arr)
     {
         return false;
     }
+
+    stack_t *allocated = map->allocated;
+    dyn_arr_t *arr = map->arr;
+
+    size_t arr_len = arr->len * MAX_NODE_SIZE;
+
+    uint32_t hash = hash_murmur3_32(key, map->key_size) % arr_len;
+    uint32_t original_hash = hash;
+
+    map_node_t node;
 
     while (true)
     {
         if (!dyn_arr_get(arr, hash, &node))
         {
+            // this means the dynamic array node containing the index hash is not allocated
+            // this is possible only if the current key is not present in the table since we never actually
+            // destroy any map_node or dynamic array node
             return false;
         }
 
-        if (!memcmp(key, node.key, ))
+        if (!memcmp(node.key, key, map->key_size))
+        {
+            // the keys are equal
+            node.is_empty = true;
+            if (!dyn_arr_set(arr, hash, &node))
+            {
+                return false;
+            }
+
+            return true;
+        }
     }
+
+    return false;
 }
 
 bool map_insert(map_t *map, void *key, void *value)

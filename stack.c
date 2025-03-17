@@ -17,6 +17,22 @@ stack_t *stack_create(size_t data_size)
     return stack;
 }
 
+bool stack_delete(stack_t *stack)
+{
+    size_t size = stack->stack_size;
+
+    stack_node_t *node = stack->bottom_node;
+    stack_node_t *tmp;
+
+    for (size_t index = 0; index < size; index++)
+    {
+        tmp = node->next;
+        free(node->data);
+        free(node);
+        node = tmp;
+    }
+}
+
 bool is_stack_empty(stack_t *stack)
 {
     return !stack->bottom_node;
