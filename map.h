@@ -5,14 +5,8 @@
 
 typedef struct
 {
-    void *key;
-    void *value;
-    bool is_empty;
-} node_t;
-
-typedef struct
-{
-    dyn_arr_t arr;
+    dyn_arr_t *arr;
+    dyn_arr_t *allocated;
     size_t key_size;
     size_t value_size;
 } map_t;
