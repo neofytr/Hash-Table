@@ -387,11 +387,11 @@ bool map_insert(map_t *map, void *key, void *value)
 
         if (node.is_empty)
         {
-            // Empty place found, but key and value pointers may not be allocated
-            // Need to allocate memory for key and value
+            // empty place found, but key and value pointers may not be allocated
+            // need to allocate memory for key and value
 
-            // If pointers are NULL, allocate new memory
-            if (node.key == NULL)
+            // if pointers are NULL, allocate new memory
+            if (!node.key)
             {
                 node.key = malloc(map->key_size);
                 if (!node.key)
@@ -400,12 +400,12 @@ bool map_insert(map_t *map, void *key, void *value)
                 }
             }
 
-            if (node.value == NULL)
+            if (!node.value)
             {
                 node.value = malloc(map->value_size);
                 if (!node.value)
                 {
-                    // Free key if it was just allocated
+                    // free key if it was just allocated
                     if (node.key == NULL)
                     {
                         free(node.key);
@@ -539,6 +539,6 @@ bool map_destroy(map_t *map)
     }
 
     dyn_arr_free(map->arr);
-    free(map); // Free the map itself
+    free(map);
     return true;
 }

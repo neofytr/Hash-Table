@@ -103,6 +103,7 @@ void dyn_arr_free(dyn_arr_t *dyn_arr)
         free(dyn_arr->nodes[i]);
     }
 
+    free(dyn_arr->default_value);
     free(dyn_arr->nodes);
     free(dyn_arr);
 }

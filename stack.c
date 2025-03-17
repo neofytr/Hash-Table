@@ -19,23 +19,29 @@ stack_t *stack_create(size_t data_size)
 
 bool stack_delete(stack_t *stack)
 {
-    size_t size = stack->stack_size;
+    if (!stack)
+    {
+        return false;
+    }
 
     stack_node_t *node = stack->bottom_node;
     stack_node_t *tmp;
 
-    for (size_t index = 0; index < size; index++)
+    while (node)
     {
         tmp = node->next;
         free(node->data);
         free(node);
         node = tmp;
     }
+
+    free(stack);
+    return true;
 }
 
 bool is_stack_empty(stack_t *stack)
 {
-    return !stack->bottom_node;
+    return stack->bottom_node;
 }
 
 bool stack_push(stack_t *stack, void *data)
