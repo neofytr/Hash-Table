@@ -1,4 +1,5 @@
 #include "map.h"
+#include <stdio.h>
 
 typedef struct
 {
@@ -335,7 +336,6 @@ bool map_insert(map_t *map, void *key, void *value)
         if (!dyn_arr_get(arr, hash, &node))
         {
             // the dynamic array node containing the index hash is not allocated yet
-
             node.key = malloc(map->key_size);
             if (!node.key)
             {
@@ -406,10 +406,7 @@ bool map_insert(map_t *map, void *key, void *value)
                 if (!node.value)
                 {
                     // free key if it was just allocated
-                    if (node.key == NULL)
-                    {
-                        free(node.key);
-                    }
+                    free(node.key);
                     return false;
                 }
             }

@@ -46,7 +46,7 @@ dyn_arr_t *dyn_arr_create(size_t min_size, size_t item_size, void *default_value
         return dyn_arr;
     }
 
-    size_t num_of_nodes = min_size / MAX_NODE_SIZE;
+    size_t num_of_nodes = min_size / MAX_NODE_SIZE + 1;
     void **nodes = (void **)calloc(num_of_nodes, sizeof(void *));
     if (!nodes)
     {

@@ -21,11 +21,9 @@ int main()
     {
         if (map_search(map, &index, &val))
         {
-            printf("%zu\n", val);
         }
         else
         {
-            printf("Key %zu not found\n", index);
         }
     }
 

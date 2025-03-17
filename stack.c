@@ -35,6 +35,7 @@ bool stack_delete(stack_t *stack)
         node = tmp;
     }
 
+    
     free(stack);
     return true;
 }
