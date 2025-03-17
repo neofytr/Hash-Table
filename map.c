@@ -74,7 +74,7 @@ bool map_search(map_t *map, void *key, void *value)
 
     size_t arr_len = arr->len * MAX_NODE_SIZE;
 
-    uint32_t hash = hash_murmur3_32(key, map->key_size) % arr_len;
+    uint32_t hash = hash_murmur3_32(key, map->key_size) & (arr_len - 1); // we ensure that arr_len is always a power of two
     uint32_t original_hash = hash;
 
     map_node_t node;
@@ -122,7 +122,7 @@ bool map_remove(map_t *map, void *key)
 
     size_t arr_len = arr->len * MAX_NODE_SIZE;
 
-    uint32_t hash = hash_murmur3_32(key, map->key_size) % arr_len;
+    uint32_t hash = hash_murmur3_32(key, map->key_size) & (arr_len - 1);
     uint32_t original_hash = hash;
 
     map_node_t node;
@@ -153,6 +153,49 @@ bool map_remove(map_t *map, void *key)
     return false;
 }
 
+static bool rehash(map_t *map)
+{
+    if (!map || map->allocated || map->arr)
+    {
+        return false;
+    }
+
+    stack_t *allocated = map->allocated;
+    dyn_arr_t *arr = map->arr;
+    size_t alloc_len = allocated->stack_size;
+
+    stack_t *new_alloc = stack_create(allocated->data_size);
+    if (!new_alloc)
+    {
+        return false;
+    }
+
+    map_node_t map_node;
+    size_t hash_node_index;
+
+    for (size_t index = 0; index < alloc_len; index++)
+    {
+        if (!stack_pop(allocated, &hash_node_index))
+        {
+            stack_delete(new_alloc);
+            return false;
+        }
+
+        if (!dyn_arr_get(arr, hash_node_index, &map_node))
+        {
+            stack_delete(new_alloc);
+            return false;
+        }
+
+        map_node.is_empty = true;
+        if (!dyn_arr_set(arr, hash_node_index, &map_node))
+        {
+            stack_delete(new_alloc);
+            return false;
+        }
+    }
+}
+
 bool map_insert(map_t *map, void *key, void *value)
 {
     if (!map || !key || !value)
@@ -173,11 +216,17 @@ bool map_insert(map_t *map, void *key, void *value)
     if (allocated->stack_size >= BUCKET_DOUBLING_CUTOFF * arr_len)
     {
         // double the number of nodes in the dynamic array and rehash
+        arr->len <<= 1U;
+        if (!rehash)
+        {
+            arr->len >>= 1U;
+            return false;
+        }
     }
 
     arr_len = arr->len * MAX_NODE_SIZE; // maybe arr->len is updated
 
-    uint32_t hash = hash_murmur3_32(key, map->key_size) % arr_len;
+    uint32_t hash = hash_murmur3_32(key, map->key_size) & (arr_len - 1);
 
     map_node_t node;
     node.is_empty = false;
@@ -273,7 +322,7 @@ bool map_insert(map_t *map, void *key, void *value)
             return true;
         }
 
-        hash = (hash + 1) % arr_len; // linear probing
+        hash = (hash + 1) & (arr_len - 1); // linear probing
     }
 
     return false;
@@ -292,7 +341,7 @@ map_t *map_create(size_t key_size, size_t value_size)
         return NULL;
     }
 
-#define INIT_DYN_LEN (1024) // can't be zero
+#define INIT_DYN_LEN (1U << 10) // can't be zero; must be a power of two
 
     map->arr = dyn_arr_create(INIT_DYN_LEN, sizeof(map_node_t));
     if (!map->arr)

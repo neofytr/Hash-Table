@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define MAX_NODE_SIZE (1U << 12)
+#define MAX_NODE_SIZE (1U << 12) // must be a power of two
 
 typedef struct
 {
