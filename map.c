@@ -515,7 +515,9 @@ bool map_destroy(map_t *map)
 
     size_t index;
     map_node_t node;
-    for (size_t counter = 0; counter < map->allocated->stack_size; counter++)
+    size_t len = map->allocated->stack_size;
+
+    for (size_t counter = 0; counter < len; counter++)
     {
         if (!stack_pop(map->allocated, &index))
         {
