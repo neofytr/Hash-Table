@@ -75,8 +75,8 @@ bool map_search(map_t *map, void *key, void *value)
 
     size_t arr_len = arr->len * MAX_NODE_SIZE;
 
-    uint32_t hash = hash_murmur3_32(key, map->key_size) & (arr_len - 1); // we ensure that arr_len is always a power of two
-    uint32_t original_hash = hash;
+    size_t hash = (size_t)hash_murmur3_32(key, map->key_size) & (arr_len - 1); // we ensure that arr_len is always a power of two
+    size_t original_hash = hash;
 
     map_node_t node;
 
@@ -144,8 +144,8 @@ bool map_remove(map_t *map, void *key)
         return false;
     }
 
-    uint32_t hash = hash_murmur3_32(key, map->key_size) & (arr_len - 1);
-    uint32_t original_hash = hash;
+    size_t hash = (size_t)hash_murmur3_32(key, map->key_size) & (arr_len - 1);
+    size_t original_hash = hash;
 
     map_node_t node;
 

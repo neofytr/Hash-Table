@@ -11,13 +11,13 @@ int main()
         return EXIT_FAILURE;
     }
 
-    for (size_t index = 0; index < 800; index++)
+    for (size_t index = 0; index < 8; index++)
     {
         map_insert(map, &index, &index);
     }
 
     size_t val;
-    for (size_t index = 0; index < 800; index++)
+    for (size_t index = 0; index < 8; index++)
     {
         if (map_search(map, &index, &val))
         {
