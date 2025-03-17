@@ -78,15 +78,28 @@ bool map_remove(map_t *map, void *key, void *value)
     uint32_t hash = hash_murmur3_32(key, map->key_size) % arr_len;
     uint32_t original_hash = hash;
 
+    map_node_t node;
+
+    node.key = malloc(map->key_size);
+    if (!node.key)
+    {
+        return false;
+    }
+
+    node.value = malloc(map->value_size);
+    if (!node.value)
+    {
+        return false;
+    }
+
     while (true)
     {
-        map_node_t node;
         if (!dyn_arr_get(arr, hash, &node))
         {
             return false;
         }
-        
-        if (!memcmp())
+
+        if (!memcmp(key, node.key, ))
     }
 }
 
@@ -116,24 +129,56 @@ bool map_insert(map_t *map, void *key, void *value)
 
     uint32_t hash = hash_murmur3_32(key, map->key_size) % arr_len;
 
+    map_node_t node;
+    node.is_empty = false;
+
     while (true)
     {
-        map_node_t node;
-        node.is_empty = false;
-        node.key = key;
-        node.value = value;
-
         if (!dyn_arr_get(arr, hash, &node))
         {
             // the dynamic array node containing the index hash is not allocated yet
-            // node is not changed as a result of this so no need to reset it
-            if (!dyn_arr_set(arr, hash, value))
+
+            node.key = malloc(map->key_size);
+            if (!node.key)
             {
+                return false;
+            }
+
+            if (!memcpy(node.key, key, map->key_size))
+            {
+                free(node.key);
+                return false;
+            }
+
+            node.value = malloc(map->value_size);
+            if (!node.value)
+            {
+                free(node.key);
+                return false;
+            }
+
+            if (!memcpy(node.value, value, map->value_size))
+            {
+                free(node.key);
+                free(node.value);
+                return false;
+            }
+
+            // dyn_arr_set will copy the contents of the map_node node into the index hash
+            // it will copy the pointers key and value and won't allocate them and save their values
+            // so, we do this before inserting the node into the array
+            // these will be freed when the map is destroyed
+            if (!dyn_arr_set(arr, hash, &node))
+            {
+                free(node.key);
+                free(node.value);
                 return false;
             }
 
             if (!stack_push(allocated, &hash))
             {
+                free(node.key);
+                free(node.value);
                 return false;
             }
 
@@ -142,20 +187,39 @@ bool map_insert(map_t *map, void *key, void *value)
 
         if (node.is_empty)
         {
-            // empty place found but node is reset
+            // empty place found
+            // the found node's key and value pointers are allocated so we just copy values to them
+            // reusing them in effect
+
             node.is_empty = false;
-            node.key = key;
-            node.value = value;
+
+            if (!memcpy(node.key, key, map->key_size))
+            {
+                free(node.key);
+                return false;
+            }
+
+            if (!memcpy(node.value, value, map->value_size))
+            {
+                free(node.key);
+                free(node.value);
+                return false;
+            }
 
             if (!dyn_arr_set(arr, hash, &node))
             {
+                free(node.key);
+                free(node.value);
                 return false;
             }
 
             if (!stack_push(allocated, &hash))
             {
+                free(node.key);
+                free(node.value);
                 return false;
             }
+
             return true;
         }
 
