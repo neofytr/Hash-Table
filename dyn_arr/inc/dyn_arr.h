@@ -6,11 +6,11 @@
 #include <string.h>
 #include <stdint.h>
 
-#define MAX_NODE_SIZE (1U << 8)
+#define MAX_NODE_SIZE (1U << 12)
 
 typedef struct
 {
-    size_t len;        // Number of nodes allocated
+    size_t len;        // Number of nodes
     size_t last_index; // Index of the last element in the array
     size_t item_size;  // Size of each data item in bytes
     void **nodes;      // Array of node pointers

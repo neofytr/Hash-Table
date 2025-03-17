@@ -8,7 +8,7 @@ typedef struct
 } map_node_t;
 
 #define SEED 0x9747b28c
-#define BUCKET_DOUBLING_CUTOFF (0.3)
+#define BUCKET_DOUBLING_CUTOFF (0.7)
 
 static inline uint32_t hash_murmur3_32(const void *key, size_t key_size)
 {
@@ -57,6 +57,114 @@ static inline uint32_t hash_murmur3_32(const void *key, size_t key_size)
     return h;
 }
 
+// we don't actually remove the map_node; we just mark it as free
+bool map_remove(map_t *map, void *key, void *value)
+{
+    if (!map || !key || !value)
+    {
+        return false;
+    }
+
+    if (!map->allocated || !map->arr)
+    {
+        return false;
+    }
+
+    stack_t *allocated = map->allocated;
+    dyn_arr_t *arr = map->arr;
+
+    size_t arr_len = arr->len * MAX_NODE_SIZE;
+
+    uint32_t hash = hash_murmur3_32(key, map->key_size) % arr_len;
+    uint32_t original_hash = hash;
+
+    while (true)
+    {
+        map_node_t node;
+        if (!dyn_arr_get(arr, hash, &node))
+        {
+            return false;
+        }
+        
+        if (!memcmp())
+    }
+}
+
+bool map_insert(map_t *map, void *key, void *value)
+{
+    if (!map || !key || !value)
+    {
+        return false;
+    }
+
+    if (!map->allocated || !map->arr)
+    {
+        return false;
+    }
+
+    stack_t *allocated = map->allocated;
+    dyn_arr_t *arr = map->arr;
+
+    size_t arr_len = arr->len * MAX_NODE_SIZE;
+
+    if (allocated->stack_size >= BUCKET_DOUBLING_CUTOFF * arr_len)
+    {
+        // double the number of nodes in the dynamic array and rehash
+    }
+
+    arr_len = arr->len * MAX_NODE_SIZE; // maybe arr->len is updated
+
+    uint32_t hash = hash_murmur3_32(key, map->key_size) % arr_len;
+
+    while (true)
+    {
+        map_node_t node;
+        node.is_empty = false;
+        node.key = key;
+        node.value = value;
+
+        if (!dyn_arr_get(arr, hash, &node))
+        {
+            // the dynamic array node containing the index hash is not allocated yet
+            // node is not changed as a result of this so no need to reset it
+            if (!dyn_arr_set(arr, hash, value))
+            {
+                return false;
+            }
+
+            if (!stack_push(allocated, &hash))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (node.is_empty)
+        {
+            // empty place found but node is reset
+            node.is_empty = false;
+            node.key = key;
+            node.value = value;
+
+            if (!dyn_arr_set(arr, hash, &node))
+            {
+                return false;
+            }
+
+            if (!stack_push(allocated, &hash))
+            {
+                return false;
+            }
+            return true;
+        }
+
+        hash = (hash + 1) % arr_len; // linear probing
+    }
+
+    return false;
+}
+
 map_t *map_create(size_t key_size, size_t value_size)
 {
     if (!key_size || !value_size)
@@ -70,7 +178,9 @@ map_t *map_create(size_t key_size, size_t value_size)
         return NULL;
     }
 
-    map->arr = dyn_arr_create(0, sizeof(map_node_t));
+#define INIT_DYN_LEN (1024) // can't be zero
+
+    map->arr = dyn_arr_create(INIT_DYN_LEN, sizeof(map_node_t));
     if (!map->arr)
     {
         free(map);
