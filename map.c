@@ -258,6 +258,7 @@ static bool rehash(map_t *map)
         void *key_ptr = map_node.key;
         void *value_ptr = map_node.value;
 
+        // this is not psbl anymore
         if (map_node.is_empty)
         {
             if (!stack_push(new_alloc, &hash_node_index))
@@ -326,8 +327,8 @@ bool map_insert(map_t *map, void *key, void *value)
         arr_len = arr->len * MAX_NODE_SIZE; // Get updated array length
     }
 
-    uint32_t hash = hash_murmur3_32(key, map->key_size) & (arr_len - 1);
-    uint32_t original_hash = hash;
+    size_t hash = (size_t)hash_murmur3_32(key, map->key_size) & (arr_len - 1);
+    size_t original_hash = hash;
 
     map_node_t node;
 
@@ -513,17 +514,17 @@ bool map_destroy(map_t *map)
     }
 
     size_t index;
-    while (!is_stack_empty(map->allocated))
+    map_node_t node;
+    for (size_t counter = 0; counter < map->allocated->stack_size; counter++)
     {
         if (!stack_pop(map->allocated, &index))
         {
-            return false;
+            break;
         }
 
-        map_node_t node;
         if (!dyn_arr_get(map->arr, index, &node))
         {
-            return false;
+            break;
         }
 
         free(node.key);

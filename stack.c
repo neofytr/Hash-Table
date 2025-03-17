@@ -35,14 +35,17 @@ bool stack_delete(stack_t *stack)
         node = tmp;
     }
 
-    
     free(stack);
     return true;
 }
 
 bool is_stack_empty(stack_t *stack)
 {
-    return stack->bottom_node;
+    if (!stack)
+    {
+        return true;
+    }
+    return !stack->bottom_node;
 }
 
 bool stack_push(stack_t *stack, void *data)
@@ -66,12 +69,7 @@ bool stack_push(stack_t *stack, void *data)
     }
 
     // copy the data into the new node
-    if (!memcpy(node->data, data, stack->data_size))
-    {
-        free(node->data);
-        free(node);
-        return false;
-    }
+    memcpy(node->data, data, stack->data_size);
 
     // insert the new node at the stack bottom
     node->next = stack->bottom_node;
@@ -91,10 +89,7 @@ bool stack_pop(stack_t *stack, void *data)
     stack_node_t *node = stack->bottom_node;
     stack->bottom_node = node->next;
 
-    if (!memcpy(data, node->data, stack->data_size))
-    {
-        return false;
-    }
+    memcpy(data, node->data, stack->data_size);
 
     stack->stack_size--;
 
