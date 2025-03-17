@@ -78,6 +78,7 @@ bool dyn_arr_set(dyn_arr_t *dyn_arr, size_t index, const void *item)
             return false;
         }
 
+        // set all the unallocated node ptrs to NULL
         memset(new_nodes + dyn_arr->len, 0, (new_len - dyn_arr->len) * sizeof(void *));
         dyn_arr->nodes = new_nodes;
         dyn_arr->len = new_len;
@@ -309,6 +310,6 @@ bool dyn_arr_append(dyn_arr_t *dyn_arr, const void *item)
         dyn_arr->is_empty = false;
         return dyn_arr_set(dyn_arr, 0, item);
     }
-    
+
     return dyn_arr_set(dyn_arr, dyn_arr->last_index + 1, item);
 }
