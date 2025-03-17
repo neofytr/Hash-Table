@@ -117,9 +117,11 @@ bool map_search(map_t *map, void *key, void *value)
     return false;
 }
 
-// we don't actually remove the map_node; we just mark it as free
+// we don't actually remove the map_node; we just mark it as free and also free the corresponding key and value
 bool map_remove(map_t *map, void *key)
 {
+    // we also don't remove this key from the allocated stack
+    // so when we rehash, we should also check if the element from the allocated stack is not empty
     if (!map || !key)
     {
         return false;
@@ -130,10 +132,16 @@ bool map_remove(map_t *map, void *key)
         return false;
     }
 
-    stack_t *allocated = map->allocated;
     dyn_arr_t *arr = map->arr;
 
     size_t arr_len = arr->len * MAX_NODE_SIZE;
+    stack_t *alloc = map->allocated;
+
+    stack_t *new_alloc = stack_create(alloc->data_size);
+    if (!new_alloc)
+    {
+        return false;
+    }
 
     uint32_t hash = hash_murmur3_32(key, map->key_size) & (arr_len - 1);
     uint32_t original_hash = hash;
@@ -165,6 +173,29 @@ bool map_remove(map_t *map, void *key)
             node.is_empty = true;
             node.key = NULL;
             node.value = NULL;
+
+            // remove the found index from the allocated stack
+            size_t elt;
+            for (size_t index = 0; index < alloc->stack_size; index++)
+            {
+                if (!stack_pop(alloc, &elt))
+                {
+                    stack_delete(new_alloc);
+                    return false;
+                }
+
+                if (elt != hash)
+                {
+                    if (!stack_push(new_alloc, &elt))
+                    {
+                        stack_delete(new_alloc);
+                        return false;
+                    }
+                }
+            }
+
+            map->allocated = new_alloc;
+            stack_delete(alloc);
 
             if (!dyn_arr_set(arr, hash, &node))
             {
@@ -213,18 +244,29 @@ static bool rehash(map_t *map)
     {
         if (!stack_pop(allocated, &hash_node_index))
         {
-            stack_delete(new_alloc);
+            stack_delete(allocated);
             return false;
         }
 
         if (!dyn_arr_get(arr, hash_node_index, &map_node))
         {
-            stack_delete(new_alloc);
+            stack_delete(allocated);
             return false;
         }
 
         void *key_ptr = map_node.key;
         void *value_ptr = map_node.value;
+
+        if (map_node.is_empty)
+        {
+            if (!stack_push(new_alloc, &hash_node_index))
+            {
+                stack_delete(allocated);
+                return false;
+            }
+
+            continue;
+        }
 
         map_node.is_empty = true;
         map_node.key = NULL;
@@ -232,7 +274,7 @@ static bool rehash(map_t *map)
 
         if (!dyn_arr_set(arr, hash_node_index, &map_node))
         {
-            stack_delete(new_alloc);
+            stack_delete(allocated);
             free(key_ptr);
             free(value_ptr);
             return false;
@@ -240,7 +282,7 @@ static bool rehash(map_t *map)
 
         if (!map_insert(map, key_ptr, value_ptr))
         {
-            stack_delete(new_alloc);
+            stack_delete(allocated);
             free(key_ptr);
             free(value_ptr);
             return false;
