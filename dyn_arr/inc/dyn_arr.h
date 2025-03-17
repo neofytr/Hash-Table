@@ -41,6 +41,12 @@ void dyn_arr_free(dyn_arr_t *dyn_arr);
  */
 bool dyn_arr_set(dyn_arr_t *dyn_arr, size_t index, const void *item);
 
+/**
+ * Appends an item immediately next to the last occupied index in the array
+ * @param dyn_arr Pointer to the dynamic array
+ * @param item Pointer to the item to copy into the array
+ * @return true if successful, false if append fails
+ */
 bool dyn_arr_append(dyn_arr_t *dyn_arr, const void *item);
 
 /**

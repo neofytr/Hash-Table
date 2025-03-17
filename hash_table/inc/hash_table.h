@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "../../dyn_arr/inc/dyn_arr.h"
+
 typedef struct node
 {
     void *key;
