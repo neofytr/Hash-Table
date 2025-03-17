@@ -1,23 +1,34 @@
 #include "map.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 int main()
 {
-    size_t value;
-
     map_t *map = map_create(sizeof(size_t), sizeof(size_t));
-
-    for (size_t index = 0; index < 1024; index++)
+    if (!map)
     {
-        value = index;
-        map_insert(map, &index, &value);
+        fprintf(stderr, "Failed to create map\n");
+        return EXIT_FAILURE;
     }
 
-    for (size_t index = 0; index < 1024; index++)
+    for (size_t index = 0; index < 2000; index++)
     {
-        map_search(map, &index, &value);
-        printf("%zu\n", value);
+        map_insert(map, &index, &index);
     }
 
+    size_t val;
+    for (size_t index = 0; index < 2000; index++)
+    {
+        if (map_search(map, &index, &val))
+        {
+            printf("%zu\n", val);
+        }
+        else
+        {
+            printf("Key %zu not found\n", index);
+        }
+    }
+
+    map_destroy(map);
     return EXIT_SUCCESS;
 }

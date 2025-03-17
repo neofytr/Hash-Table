@@ -1,7 +1,7 @@
 #include "../inc/dyn_arr.h"
 #include <math.h>
 
-dyn_arr_t *dyn_arr_create(size_t min_size, size_t item_size)
+dyn_arr_t *dyn_arr_create(size_t min_size, size_t item_size, void *default_value)
 {
     if (!item_size)
     {
@@ -17,6 +17,27 @@ dyn_arr_t *dyn_arr_create(size_t min_size, size_t item_size)
     dyn_arr->item_size = item_size;
     dyn_arr->last_index = 0;
     dyn_arr->is_empty = true;
+
+    if (!default_value)
+    {
+        dyn_arr->default_value = NULL;
+    }
+    else
+    {
+        dyn_arr->default_value = malloc(item_size);
+        if (!dyn_arr->default_value)
+        {
+            free(dyn_arr);
+            return NULL;
+        }
+
+        if (!memcpy(dyn_arr->default_value, default_value, item_size))
+        {
+            free(dyn_arr->default_value);
+            free(dyn_arr);
+            return NULL;
+        }
+    }
 
     if (!min_size)
     {
@@ -44,6 +65,23 @@ dyn_arr_t *dyn_arr_create(size_t min_size, size_t item_size)
                 free(nodes);
                 free(dyn_arr);
                 return NULL;
+            }
+        }
+
+        if (default_value)
+        {
+            for (size_t counter = 0; counter < MAX_NODE_SIZE; counter++)
+            {
+                if (!memcpy((char *)nodes[index] + (counter * item_size), default_value, item_size))
+                {
+                    for (size_t count = 0; count <= index; count++)
+                    {
+                        free(nodes[count]);
+                    }
+                    free(nodes);
+                    free(dyn_arr);
+                    return NULL;
+                }
             }
         }
     }
@@ -105,6 +143,15 @@ bool dyn_arr_set(dyn_arr_t *dyn_arr, size_t index, const void *item)
         if (!dyn_arr->nodes[node_no])
         {
             return false;
+        }
+
+        if (dyn_arr->default_value)
+        {
+            for (size_t counter = 0; counter < MAX_NODE_SIZE; counter++)
+            {
+                memcpy((char *)dyn_arr->nodes[node_no] + (counter * dyn_arr->item_size),
+                       dyn_arr->default_value, dyn_arr->item_size);
+            }
         }
     }
 

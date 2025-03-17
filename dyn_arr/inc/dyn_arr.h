@@ -14,6 +14,7 @@ typedef struct
     size_t last_index; // Index of the last element in the array
     size_t item_size;  // Size of each data item in bytes
     void **nodes;      // Array of node pointers
+    void *default_value;
     bool is_empty;
 } dyn_arr_t;
 
@@ -26,7 +27,7 @@ typedef bool (*dyn_compare_t)(const void *a, const void *b);
  * @param item_size Size of each item in bytes
  * @return Pointer to the new dynamic array, or NULL if allocation failed
  */
-dyn_arr_t *dyn_arr_create(size_t min_size, size_t item_size);
+dyn_arr_t *dyn_arr_create(size_t min_size, size_t item_size, void *default_value);
 
 /**
  * Frees all memory associated with the dynamic array
