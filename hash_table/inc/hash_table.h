@@ -26,7 +26,7 @@ typedef struct
 
 } hash_table_t;
 
-hash_table_t *hash_table_create(size_t num_of_buckets, size_t key_size, size_t value_size); // number of buckets you want in the hashtable
+hash_table_t *hash_table_create(size_t num_of_buckets, size_t key_size, size_t value_size); // initial number of buckets you want in the hashtable
                                                                                             // each bucket is a linked list of nodes
 void hash_table_destroy(hash_table_t *table);
 
