@@ -5,13 +5,13 @@ typedef struct
     void *key;
     void *value;
     bool is_empty;
-} node_t;
+} map_node_t;
 
 typedef struct
 {
     size_t node_no;
     size_t node_index;
-} allocated_t;
+} map_allocated_t;
 
 map_t *map_create(size_t key_size, size_t value_size)
 {
@@ -26,14 +26,8 @@ map_t *map_create(size_t key_size, size_t value_size)
         return NULL;
     }
 
-    map->arr = dyn_arr_create(0, sizeof(node_t));
+    map->arr = dyn_arr_create(0, sizeof(map_node_t));
     if (!map->arr)
-    {
-        return NULL;
-    }
-
-    map->allocated = dyn_arr_create(0, sizeof(allocated_t));
-    if (!map->allocated)
     {
         return NULL;
     }
