@@ -159,11 +159,20 @@ bool map_remove(map_t *map, void *key)
         if (!memcmp(node.key, key, map->key_size))
         {
             // the keys are equal
+            void *key_ptr = node.key;
+            void *value_ptr = node.value;
+
             node.is_empty = true;
+            node.key = NULL;
+            node.value = NULL;
+
             if (!dyn_arr_set(arr, hash, &node))
             {
                 return false;
             }
+
+            free(key_ptr);
+            free(value_ptr);
 
             return true;
         }
@@ -214,27 +223,34 @@ static bool rehash(map_t *map)
             return false;
         }
 
+        void *key_ptr = map_node.key;
+        void *value_ptr = map_node.value;
+
         map_node.is_empty = true;
+        map_node.key = NULL;
+        map_node.value = NULL;
+
         if (!dyn_arr_set(arr, hash_node_index, &map_node))
         {
             stack_delete(new_alloc);
-            free(map_node.key);
-            free(map_node.value);
+            free(key_ptr);
+            free(value_ptr);
             return false;
         }
 
-        if (!map_insert(map, map_node.key, map_node.value))
+        if (!map_insert(map, key_ptr, value_ptr))
         {
             stack_delete(new_alloc);
-            free(map_node.key);
-            free(map_node.value);
+            free(key_ptr);
+            free(value_ptr);
             return false;
         }
 
-        free(map_node.key);
-        free(map_node.value);
+        free(key_ptr);
+        free(value_ptr);
     }
 
+    stack_delete(allocated);
     return true;
 }
 
@@ -329,9 +345,32 @@ bool map_insert(map_t *map, void *key, void *value)
 
         if (node.is_empty)
         {
-            // empty place found
-            // the found node's key and value pointers are allocated so we just copy values to them
-            // reusing them in effect
+            // Empty place found, but key and value pointers may not be allocated
+            // Need to allocate memory for key and value
+
+            // If pointers are NULL, allocate new memory
+            if (node.key == NULL)
+            {
+                node.key = malloc(map->key_size);
+                if (!node.key)
+                {
+                    return false;
+                }
+            }
+
+            if (node.value == NULL)
+            {
+                node.value = malloc(map->value_size);
+                if (!node.value)
+                {
+                    // Free key if it was just allocated
+                    if (node.key == NULL)
+                    {
+                        free(node.key);
+                    }
+                    return false;
+                }
+            }
 
             node.is_empty = false;
 
@@ -358,10 +397,10 @@ bool map_insert(map_t *map, void *key, void *value)
             return true;
         }
 
-        // Check if the key already exists
+        // check if the key already exists
         if (!memcmp(node.key, key, map->key_size))
         {
-            // Update existing key's value
+            // update existing key's value
             if (!memcpy(node.value, value, map->value_size))
             {
                 return false;
@@ -403,6 +442,8 @@ map_t *map_create(size_t key_size, size_t value_size)
 
     map_node_t default_node;
     default_node.is_empty = true;
+    default_node.key = NULL;
+    default_node.value = NULL;
 
     map->arr = dyn_arr_create(INIT_DYN_LEN, sizeof(map_node_t), &default_node);
     if (!map->arr)
