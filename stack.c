@@ -12,6 +12,7 @@ stack_t *stack_create(size_t data_size)
 
     stack->data_size = data_size;
     stack->bottom_node = NULL;
+    stack->stack_size = 0;
 
     return stack;
 }
@@ -52,6 +53,7 @@ bool stack_push(stack_t *stack, void *data)
     // insert the new node at the stack bottom
     node->next = stack->bottom_node;
     stack->bottom_node = node;
+    stack->stack_size++;
 
     return true;
 }
@@ -70,6 +72,8 @@ bool stack_pop(stack_t *stack, void *data)
     {
         return false;
     }
+
+    stack->stack_size--;
 
     free(node->data);
     free(node);

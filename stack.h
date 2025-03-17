@@ -16,6 +16,7 @@ typedef struct
 {
     stack_node_t *bottom_node; // insertion and deletion happens at the bottom node only
     size_t data_size;
+    size_t stack_size;
 } stack_t;
 
 stack_t *stack_create(size_t data_size); // data size in bytes
