@@ -169,6 +169,7 @@ static bool rehash(map_t *map)
     {
         return false;
     }
+    map->allocated = new_alloc;
 
     map_node_t map_node;
     size_t hash_node_index;
@@ -191,9 +192,24 @@ static bool rehash(map_t *map)
         if (!dyn_arr_set(arr, hash_node_index, &map_node))
         {
             stack_delete(new_alloc);
+            free(map_node.key);
+            free(map_node.value);
             return false;
         }
+
+        if (!map_insert(map, map_node.key, map_node.value))
+        {
+            stack_delete(new_alloc);
+            free(map_node.key);
+            free(map_node.value);
+            return false;
+        }
+
+        free(map_node.key);
+        free(map_node.value);
     }
+
+    return true;
 }
 
 bool map_insert(map_t *map, void *key, void *value)
