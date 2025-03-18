@@ -1,4 +1,4 @@
-#include "map.h"
+#include "../inc/map.h"
 #include <stdio.h>
 
 typedef struct

@@ -1,8 +1,8 @@
 #ifndef MAP_H
 #define MAP_H
 
-#include "dyn_arr/inc/dyn_arr.h"
-#include "stack.h"
+#include "../../dyn_arr/inc/dyn_arr.h"
+#include "../../stack/inc/stack.h"
 
 typedef struct
 {

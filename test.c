@@ -1,4 +1,4 @@
-#include "map.h"
+#include "map/inc/map.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -11,19 +11,21 @@ int main()
         return EXIT_FAILURE;
     }
 
-    for (size_t index = 0; index < 8; index++)
+    for (size_t index = 0; index < 8000; index++)
     {
         map_insert(map, &index, &index);
     }
 
     size_t val;
-    for (size_t index = 0; index < 8; index++)
+    for (size_t index = 0; index < 8000; index++)
     {
         if (map_search(map, &index, &val))
         {
+            printf("%zu\n", val);
         }
         else
         {
+            printf("Key %zu not found\n", index);
         }
     }
 

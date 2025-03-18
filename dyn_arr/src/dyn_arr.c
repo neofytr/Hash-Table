@@ -158,6 +158,11 @@ bool dyn_arr_set(dyn_arr_t *dyn_arr, size_t index, const void *item)
 
     memcpy((char *)dyn_arr->nodes[node_no] + (node_index * dyn_arr->item_size),
            item, dyn_arr->item_size);
+
+    if (dyn_arr->is_empty)
+    {
+        dyn_arr->is_empty = false;
+    }
     return true;
 }
 

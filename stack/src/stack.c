@@ -1,4 +1,4 @@
-#include "stack.h"
+#include "../inc/stack.h"
 
 #include <string.h>
 
