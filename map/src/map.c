@@ -3,6 +3,7 @@
 
 static bool map_insert_rehash(map_t *map, void *key_ptr, void *value_ptr);
 static bool rehash(map_t *map);
+static inline uint32_t rotl32(uint32_t x, int r);
 
 typedef struct
 {
@@ -12,53 +13,116 @@ typedef struct
 } map_node_t;
 
 #define SEED 0x9747b28c
-#define BUCKET_DOUBLING_CUTOFF (0.7)
+#define BUCKET_DOUBLING_CUTOFF (0.47)
 
-static inline uint32_t hash_murmur3_32(const void *key, size_t key_size)
+#include <stdint.h>
+#include <stddef.h>
+
+#define XXH_PRIME32_1 2654435761U
+#define XXH_PRIME32_2 2246822519U
+#define XXH_PRIME32_3 3266489917U
+#define XXH_PRIME32_4 668265263U
+#define XXH_PRIME32_5 374761393U
+
+static inline uint32_t rotl32(uint32_t x, int r)
 {
-    const uint8_t *data = (const uint8_t *)key;
-    const int nblocks = key_size / 4;
-    uint32_t h = SEED;
-    const uint32_t c1 = 0xcc9e2d51;
-    const uint32_t c2 = 0x1b873593;
+    return (x << r) | (x >> (32 - r));
+}
 
-    const uint32_t *blocks = (const uint32_t *)(data);
-    for (int i = 0; i < nblocks; i++)
+static inline uint32_t xxh32(const void *key, size_t len)
+{
+    const uint8_t *p = (const uint8_t *)key;
+    uint32_t h32;
+
+    if (len <= 4)
     {
-        uint32_t k = blocks[i];
-        k *= c1;
-        k = (k << 15) | (k >> 17);
-        k *= c2;
+        const uint8_t *p = (const uint8_t *)key;
+        uint32_t h32 = SEED + XXH_PRIME32_5;
 
-        h ^= k;
-        h = (h << 13) | (h >> 19);
-        h = h * 5 + 0xe6546b64;
+        h32 += (uint32_t)len;
+
+        switch (len)
+        {
+        case 4:
+            h32 += ((uint32_t)p[3]) << 24;
+        case 3:
+            h32 += ((uint32_t)p[2]) << 16;
+        case 2:
+            h32 += ((uint32_t)p[1]) << 8;
+        case 1:
+            h32 += (uint32_t)p[0];
+            h32 *= XXH_PRIME32_3;
+            h32 = rotl32(h32, 17) * XXH_PRIME32_4;
+        }
+
+        h32 ^= h32 >> 15;
+        h32 *= XXH_PRIME32_2;
+        h32 ^= h32 >> 13;
+        h32 *= XXH_PRIME32_3;
+        h32 ^= h32 >> 16;
+
+        return h32;
     }
 
-    const uint8_t *tail = (const uint8_t *)(data + nblocks * 4);
-    uint32_t k1 = 0;
-    switch (key_size & 3)
+    if (len >= 16)
     {
-    case 3:
-        k1 ^= tail[2] << 16;
-    case 2:
-        k1 ^= tail[1] << 8;
-    case 1:
-        k1 ^= tail[0];
-        k1 *= c1;
-        k1 = (k1 << 15) | (k1 >> 17);
-        k1 *= c2;
-        h ^= k1;
+        const uint32_t *blocks = (const uint32_t *)p;
+        size_t nblocks = len / 16;
+        uint32_t v1 = SEED + XXH_PRIME32_1 + XXH_PRIME32_2;
+        uint32_t v2 = SEED + XXH_PRIME32_2;
+        uint32_t v3 = SEED + 0;
+        uint32_t v4 = SEED - XXH_PRIME32_1;
+
+        for (size_t i = 0; i < nblocks; i++)
+        {
+            v1 += blocks[i * 4] * XXH_PRIME32_2;
+            v1 = rotl32(v1, 13);
+            v1 *= XXH_PRIME32_1;
+
+            v2 += blocks[i * 4 + 1] * XXH_PRIME32_2;
+            v2 = rotl32(v2, 13);
+            v2 *= XXH_PRIME32_1;
+
+            v3 += blocks[i * 4 + 2] * XXH_PRIME32_2;
+            v3 = rotl32(v3, 13);
+            v3 *= XXH_PRIME32_1;
+
+            v4 += blocks[i * 4 + 3] * XXH_PRIME32_2;
+            v4 = rotl32(v4, 13);
+            v4 *= XXH_PRIME32_1;
+        }
+
+        h32 = rotl32(v1, 1) + rotl32(v2, 7) + rotl32(v3, 12) + rotl32(v4, 18);
+    }
+    else
+    {
+        h32 = SEED + XXH_PRIME32_5;
     }
 
-    h ^= key_size;
-    h ^= h >> 16;
-    h *= 0x85ebca6b;
-    h ^= h >> 13;
-    h *= 0xc2b2ae35;
-    h ^= h >> 16;
+    h32 += (uint32_t)len;
 
-    return h;
+    while (len >= 4)
+    {
+        h32 += (*(const uint32_t *)p) * XXH_PRIME32_3;
+        h32 = rotl32(h32, 17) * XXH_PRIME32_4;
+        p += 4;
+        len -= 4;
+    }
+
+    while (len > 0)
+    {
+        h32 += (*p++) * XXH_PRIME32_5;
+        h32 = rotl32(h32, 11) * XXH_PRIME32_1;
+        len--;
+    }
+
+    h32 ^= h32 >> 15;
+    h32 *= XXH_PRIME32_2;
+    h32 ^= h32 >> 13;
+    h32 *= XXH_PRIME32_3;
+    h32 ^= h32 >> 16;
+
+    return h32;
 }
 
 bool map_search(map_t *map, void *key, void *value)
@@ -76,7 +140,7 @@ bool map_search(map_t *map, void *key, void *value)
     stack_t *allocated = map->allocated;
     dyn_arr_t *arr = map->arr;
 
-    size_t hash = (size_t)hash_murmur3_32(key, map->key_size) & (map->curr_max_len - 1);
+    size_t hash = (size_t)xxh32(key, map->key_size) & (map->curr_max_len - 1);
     size_t original_hash = hash;
 
     map_node_t node;
@@ -93,9 +157,19 @@ bool map_search(map_t *map, void *key, void *value)
             return false;
         }
 
-        if (!memcmp(node.key, key, map->key_size))
+        if (map->key_size <= 4)
         {
-            // the keys are equal - copy value only if the output parameter is not NULL
+            if (*((uint32_t *)node.key) == *((uint32_t *)key))
+            {
+                if (value)
+                {
+                    memcpy(value, node.value, map->value_size);
+                }
+                return true;
+            }
+        }
+        else if (!memcmp(node.key, key, map->key_size))
+        {
             if (value)
             {
                 memcpy(value, node.value, map->value_size);
@@ -138,7 +212,7 @@ bool map_remove(map_t *map, void *key)
         return false;
     }
 
-    size_t hash = (size_t)hash_murmur3_32(key, map->key_size) & (map->curr_max_len - 1);
+    size_t hash = (size_t)xxh32(key, map->key_size) & (map->curr_max_len - 1);
     size_t original_hash = hash;
 
     map_node_t node;
@@ -322,7 +396,7 @@ bool map_insert_rehash(map_t *map, void *key_ptr, void *value_ptr)
     stack_t *allocated = map->allocated;
     dyn_arr_t *arr = map->arr;
 
-    size_t hash = (size_t)hash_murmur3_32(key_ptr, map->key_size) & (map->curr_max_len - 1);
+    size_t hash = (size_t)xxh32(key_ptr, map->key_size) & (map->curr_max_len - 1);
     size_t original_hash = hash;
 
     map_node_t node;
@@ -408,7 +482,7 @@ bool map_insert(map_t *map, void *key, void *value)
         allocated = map->allocated;
     }
 
-    size_t hash = (size_t)hash_murmur3_32(key, map->key_size) & (map->curr_max_len - 1);
+    size_t hash = (size_t)xxh32(key, map->key_size) & (map->curr_max_len - 1);
     size_t original_hash = hash;
 
     map_node_t node;
