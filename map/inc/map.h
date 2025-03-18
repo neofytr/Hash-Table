@@ -10,6 +10,7 @@ typedef struct
     stack_t *allocated;
     size_t key_size;
     size_t value_size;
+    size_t curr_max_len;
 } map_t;
 
 bool map_insert(map_t *map, void *key, void *value);
