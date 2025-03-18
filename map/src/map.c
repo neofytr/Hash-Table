@@ -363,6 +363,8 @@ bool map_insert_rehash(map_t *map, void *key_ptr, void *value_ptr)
             return false;
         }
     }
+
+    return false;
 }
 
 bool map_insert(map_t *map, void *key, void *value)
@@ -526,7 +528,7 @@ bool map_insert(map_t *map, void *key, void *value)
         hash = (hash + 1) & (map->curr_max_len - 1); // linear probing
         if (hash == original_hash)
         {
-            // Hash table is full (should not happen with rehashing)
+            // hash table is full (should not happen with rehashing)
             return false;
         }
     }
