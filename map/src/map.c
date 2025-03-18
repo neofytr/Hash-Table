@@ -1,6 +1,9 @@
 #include "../inc/map.h"
 #include <stdio.h>
 
+static bool map_insert_rehash(map_t *map, void *key_ptr, void *value_ptr);
+static bool rehash(map_t *map);
+
 typedef struct
 {
     void *key;
@@ -93,7 +96,7 @@ bool map_search(map_t *map, void *key, void *value)
         if (!memcmp(node.key, key, map->key_size))
         {
             // the keys are equal - copy value only if the output parameter is not NULL
-            if (!value)
+            if (value)
             {
                 memcpy(value, node.value, map->value_size);
             }
@@ -218,109 +221,83 @@ static bool rehash(map_t *map)
         return false;
     }
 
-    stack_t *allocated = map->allocated;
+    stack_t *old_allocated = map->allocated;
     dyn_arr_t *arr = map->arr;
-    size_t alloc_len = allocated->stack_size;
+    size_t len = old_allocated->stack_size;
 
-    stack_t *new_alloc = stack_create(allocated->data_size);
-    if (!new_alloc)
+    typedef struct
+    {
+        void *key;
+        void *value;
+    } key_value_pair;
+
+    key_value_pair *pairs = malloc(len * sizeof(key_value_pair));
+    if (!pairs)
     {
         return false;
     }
 
-    // save the old allocation stack
-    stack_t *old_alloc = map->allocated;
+    size_t pair_count = 0;
+    size_t hash_index;
+    map_node_t node;
 
-    // create a new allocation stack
-    map->allocated = new_alloc;
-
-    map_node_t map_node;
-    size_t hash_node_index;
-
-    // track saved nodes to avoid double frees later
-    void **saved_keys = malloc(sizeof(void *) * alloc_len);
-    void **saved_values = malloc(sizeof(void *) * alloc_len);
-    size_t saved_count = 0;
-
-    if (!saved_keys || !saved_values)
+    for (size_t i = 0; i < len; i++)
     {
-        if (saved_keys)
-            free(saved_keys);
-        if (saved_values)
-            free(saved_values);
-        map->allocated = old_alloc;
-        stack_delete(new_alloc);
+        if (!stack_pop(old_allocated, &hash_index))
+        {
+            free(pairs);
+            return false;
+        }
+
+        if (!dyn_arr_get(arr, hash_index, &node))
+        {
+            free(pairs);
+            return false;
+        }
+
+        if (!node.is_empty)
+        {
+            pairs[pair_count].key = node.key;
+            pairs[pair_count].value = node.value;
+            pair_count++;
+        }
+    }
+
+    stack_t *new_allocated = stack_create(sizeof(size_t));
+    if (!new_allocated)
+    {
+        free(pairs);
         return false;
     }
 
-    for (size_t index = 0; index < alloc_len; index++)
+    map->allocated = new_allocated;
+
+    for (size_t i = 0; i < pair_count; i++)
     {
-        if (!stack_pop(old_alloc, &hash_node_index))
+        if (!map_insert_rehash(map, pairs[i].key, pairs[i].value))
         {
-            free(saved_keys);
-            free(saved_values);
-            map->allocated = old_alloc;
-            stack_delete(new_alloc);
-            return false;
-        }
+            for (size_t j = i; j < pair_count; j++)
+            {
+                free(pairs[j].key);
+                free(pairs[j].value);
+            }
 
-        if (!dyn_arr_get(arr, hash_node_index, &map_node))
-        {
-            free(saved_keys);
-            free(saved_values);
-            map->allocated = old_alloc;
-            stack_delete(new_alloc);
-            return false;
-        }
+            stack_delete(new_allocated);
 
-        // skip empty nodes
-        if (map_node.is_empty)
-        {
-            continue;
-        }
+            map->allocated = old_allocated;
 
-        void *key_ptr = map_node.key;
-        void *value_ptr = map_node.value;
-
-        // save these pointers to avoid double-freeing later
-        saved_keys[saved_count] = key_ptr;
-        saved_values[saved_count] = value_ptr;
-        saved_count++;
-
-        // mark the node as empty without freeing its memory yet
-        map_node.is_empty = true;
-        map_node.key = NULL;
-        map_node.value = NULL;
-
-        if (!dyn_arr_set(arr, hash_node_index, &map_node))
-        {
-            free(saved_keys);
-            free(saved_values);
-            map->allocated = old_alloc;
-            stack_delete(new_alloc);
-            return false;
-        }
-
-        // use specialized rehash insertion to avoid copying already allocated memory
-        if (!map_insert_rehash(map, key_ptr, value_ptr))
-        {
-            // restore allocation stack on failure
-            free(saved_keys);
-            free(saved_values);
-            map->allocated = old_alloc;
-            stack_delete(new_alloc);
+            free(pairs);
             return false;
         }
     }
 
-    free(saved_keys);
-    free(saved_values);
-    stack_delete(old_alloc);
+    stack_delete(old_allocated);
+
+    free(pairs);
     return true;
 }
 
-// special version of map_insert that doesn't copy key and value (for rehashing)
-static bool map_insert_rehash(map_t *map, void *key_ptr, void *value_ptr)
+bool map_insert_rehash(map_t *map, void *key_ptr, void *value_ptr)
 {
     if (!map || !key_ptr || !value_ptr)
     {
@@ -335,7 +312,6 @@ static bool map_insert_rehash(map_t *map, void *key_ptr, void *value_ptr)
     stack_t *allocated = map->allocated;
     dyn_arr_t *arr = map->arr;
 
-    // calculate hash using the actual key content
     size_t hash = (size_t)hash_murmur3_32(key_ptr, map->key_size) & (map->curr_max_len - 1);
     size_t original_hash = hash;
 
@@ -345,8 +321,6 @@ static bool map_insert_rehash(map_t *map, void *key_ptr, void *value_ptr)
     {
         if (!dyn_arr_get(arr, hash, &node))
         {
-            // the dynamic array node containing the index hash is not allocated yet
-            // use the existing pointers instead of allocating new memory
             node.key = key_ptr;
             node.value = value_ptr;
             node.is_empty = false;
@@ -366,7 +340,6 @@ static bool map_insert_rehash(map_t *map, void *key_ptr, void *value_ptr)
 
         if (node.is_empty)
         {
-            // empty place found, use the existing pointers
             node.key = key_ptr;
             node.value = value_ptr;
             node.is_empty = false;
@@ -384,23 +357,12 @@ static bool map_insert_rehash(map_t *map, void *key_ptr, void *value_ptr)
             return true;
         }
 
-        // check if the key already exists
-        if (!memcmp(node.key, key_ptr, map->key_size))
-        {
-            // this should not happen during rehash - each key should be unique
-            // but handle it just in case by freeing the new pointers
-            return false;
-        }
-
-        hash = (hash + 1) & (map->curr_max_len - 1); // linear probing
+        hash = (hash + 1) & (map->curr_max_len - 1);
         if (hash == original_hash)
         {
-            // hash table is full (should not happen with rehashing)
             return false;
         }
     }
-
-    return false;
 }
 
 bool map_insert(map_t *map, void *key, void *value)
@@ -427,6 +389,11 @@ bool map_insert(map_t *map, void *key, void *value)
             map->curr_max_len >>= 1U;
             return false;
         }
+        // critical, change the allocated variable after rehashing since the stack changes during rehashing
+        // this was causing the  key pushed during rehashing to be lost
+        // it was pushed into the wrong allocated table
+
+        allocated = map->allocated;
     }
 
     size_t hash = (size_t)hash_murmur3_32(key, map->key_size) & (map->curr_max_len - 1);
