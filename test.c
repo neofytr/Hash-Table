@@ -11,7 +11,7 @@ int main()
         return EXIT_FAILURE;
     }
 
-    for (size_t index = 0; index < 1400; index++)
+    for (size_t index = 0; index < 140000; index++)
     {
         printf("%d\n", map_insert(map, &index, &index));
     }

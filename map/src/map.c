@@ -260,6 +260,16 @@ static bool rehash(map_t *map)
             pairs[pair_count].key = node.key;
             pairs[pair_count].value = node.value;
             pair_count++;
+
+            node.key = NULL;
+            node.value = NULL;
+            node.is_empty = true;
+
+            if (!dyn_arr_set(arr, hash_index, &node))
+            {
+                free(pairs);
+                return false;
+            }
         }
     }
 
