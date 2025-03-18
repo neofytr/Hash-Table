@@ -13,11 +13,11 @@ int main()
 
     for (size_t index = 0; index < 140000; index++)
     {
-        printf("%d\n", map_insert(map, &index, &index));
+        map_insert(map, &index, &index);
     }
 
-    /* size_t val;
-    for (size_t index = 0; index < 1400; index++)
+    size_t val;
+    for (size_t index = 0; index < 140000; index++)
     {
         if (map_search(map, &index, &val))
         {
@@ -27,7 +27,7 @@ int main()
         {
             printf("Key %zu not found\n", index);
         }
-    } */
+    }
 
     map_destroy(map);
 
